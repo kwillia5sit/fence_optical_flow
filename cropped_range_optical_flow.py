@@ -79,6 +79,8 @@ def callback(data):
 
     #AKAZE detect keypoints from the first frame
     raw_key_points, descsi = detector.detectAndCompute(prev_gray, None)
+	#Keypoints come out as weird form, need to convert to array of coordinate pairs for optical flow to work
+	#Prints are to check the shape of array as it converts to coordinate tuples
     print("What raw keypoints looks like:")
     print(raw_key_points)
     print("array shape of raw keypoints", np.shape(raw_key_points))
@@ -117,11 +119,14 @@ def callback(data):
     cv2.imshow("current grasyscale", cur_gray)
 
 	  #calculate optical flow
-    cur_points, st, err = cv2.calcOpticalFlowPyrLK(prev_gray,
-									        cur_gray,
-									        key_points, None,
+    cur_points, st, err = cv2.calcOpticalFlowPyrLK(prev_gray,	#first frame in series
+									        cur_gray, #second frame in series
+									        key_points, #features to track
+						   				None,  
 									         **lk_params)
-    tracking = []
+	#Set up a place to store the points we want to track
+    tracking = [] 
+
     #Keep this raw_cur_points separate from cur_points because it comes in a different format
     raw_cur_points, desc_cur = detector.detectAndCompute(cur_gray, None, cur_points)
     matches = bf.match(descsi, desc_cur)
