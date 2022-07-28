@@ -14,7 +14,7 @@ from statistics import mean
 i = 0
 
 # Parameters for lucas kanade optical flow
-lk_params = dict(winSize = (9, 9),              #window size each pyramid level
+lk_params = dict(winSize = (21, 21),              #window size each pyramid level
 	    		 maxLevel = 4,                       #number of pyramid levels 
 		    	 criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT,   #termination criteria: Stop after 10 iterations, 
                                                                                 #criteria count matches the quality level
@@ -37,8 +37,8 @@ def get_image(data):
   frame = br.imgmsg_to_cv2(data)
 
   # create points for polygon region of interest
-  points = np.array([[400, 400], [420, 380], [440, 360], [760, 360], [780, 380], [800, 400],
-                      [800, 700], [400, 700]])
+  points = np.array([[425, 400], [550, 375], [675, 400],
+                      [675, 470], [420, 470]]) #Pentagon cropped to fence position
   # reshape array
   points = points.reshape((-1, 1, 2))
 
@@ -50,7 +50,19 @@ def get_image(data):
   #Define the region we need
   res = cv2.bitwise_and(frame, frame, mask = mask) 
   rect = cv2.boundingRect(points) # returns (x,y,w,h) of the rectangle around the polygon
-  cropped = res[rect[1]: rect[1] + rect[3], rect[0]: rect[0] + rect[2]]
+  cropped_small = res[rect[1]: rect[1] + rect[3], rect[0]: rect[0] + rect[2]]
+  cv2.imshow("small cropped", cropped_small)
+  #Resize the cropped image so we can see it big
+  #Name the rescale size
+  scale_percent = 300
+  #Name the scaling factor 
+  scale_factor = 3
+  #Find the rescaled width and height of the image
+  width = int(cropped_small.shape[1] * scale_percent / 100)
+  height = int(cropped_small.shape[0] * scale_percent / 100)
+  #Resize the image
+  cropped = cv2.resize(cropped_small, [width, height])
+
   #Convert that frame to a grayscale image:
   gray_frame = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
 
@@ -67,6 +79,8 @@ def callback(data):
   global i
   global br
   global draw_mask
+  global mask_line
+  global frame
   global descsi
   global color_array
   #Initialize cv image convertor and AKAZE feature detector
@@ -79,8 +93,6 @@ def callback(data):
 
     #AKAZE detect keypoints from the first frame
     raw_key_points, descsi = detector.detectAndCompute(prev_gray, None)
-	#Keypoints come out as weird form, need to convert to array of coordinate pairs for optical flow to work
-	#Prints are to check the shape of array as it converts to coordinate tuples
     print("What raw keypoints looks like:")
     print(raw_key_points)
     print("array shape of raw keypoints", np.shape(raw_key_points))
@@ -109,24 +121,22 @@ def callback(data):
     my_size = int(array_size/2)
     #Reshape the array to be used by optical flow calculation
     key_points.shape = (my_size, 1, 2)
-    # Create a mask image for drawing purposes
-    draw_mask = np.zeros_like(prev_frame)
+    
     i = i+1
 
-  else:
+  if i > 0 and i <30:
     #Get the current frame
     cur_frame, cur_gray = get_image(data)
     cv2.imshow("current grasyscale", cur_gray)
+    # Create a mask image for drawing purposes
+    draw_mask = np.zeros_like(cur_frame)
 
 	  #calculate optical flow
-    cur_points, st, err = cv2.calcOpticalFlowPyrLK(prev_gray,	#first frame in series
-									        cur_gray, #second frame in series
-									        key_points, #features to track
-						   				None,  
+    cur_points, st, err = cv2.calcOpticalFlowPyrLK(prev_gray,
+									        cur_gray,
+									        key_points, None,
 									         **lk_params)
-	#Set up a place to store the points we want to track
-    tracking = [] 
-
+    tracking = []
     #Keep this raw_cur_points separate from cur_points because it comes in a different format
     raw_cur_points, desc_cur = detector.detectAndCompute(cur_gray, None, cur_points)
     matches = bf.match(descsi, desc_cur)
@@ -187,6 +197,12 @@ def callback(data):
     prev_gray = cur_gray
     #add 1 to the counter 
     i = i+1
+    if i == 30:
+      #Do the transform
+   
+
+      #reset loop to beginning (i = 0)
+      i = 0
 #end of callback loop
 
 def receive_message():
