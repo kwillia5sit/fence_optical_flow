@@ -7,7 +7,7 @@ The fence is the dotted pattern at the bottom of the image arc. <br>
 Cropped_range_optical_flow crops the image arc to view just that section (the rest is a bright wall that causes too much noise in the feature detection). </p>
 	
 	Note: If switching to see the old field data, subscribe to '/sonar_oculus/image' instead.
-	Also run oculus_viewer_2.py so it can convert the ping data to image data and be used by the script
+	Also run oculus_viewer_2.py so it can convert the ping data to image data and be used by the optical flow script
 	
 <p> Inputs and Outputs for each function: <br>
 **oculus_viewer_2.py** <br>
