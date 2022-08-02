@@ -152,7 +152,7 @@ def callback(data):
     #Get the current frame
     cur_frame, cur_gray = get_image(data)
     cv2.imshow("current grasyscale", cur_gray)
-    cv2.waitKey(0)
+    cv2.waitKey(1)
     # Create a mask image for drawing purposes
     draw_mask = np.zeros_like(cur_frame)
 
@@ -218,7 +218,7 @@ def callback(data):
         else:
           pass
     cv2.imshow('optical flow', image)
-    cv2.waitKey(0)
+    cv2.waitKey(1)
     print("z's are ",s, z.x, z.y)
     if i == 30:
       #Do the transform
