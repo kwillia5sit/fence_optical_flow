@@ -45,7 +45,7 @@ Note: Use catkin build instead of catkin make for the workspace
 	<li> Run Roscore </li>
 	<li> python3 Run oculus_viewer_2.py (If running old marine data) </li>
 	<li> python3 Run optical flow script </li>
-	<li> rosbag play Run bag file </li>
+	<li> "rosbag play -s 100 [bag file name]" Run bag file </li>
 </ol>
 <ul>
 	<li> sample_data.bag is old marine data </li>
@@ -56,3 +56,8 @@ Note: Use catkin build instead of catkin make for the workspace
 	Note: If using the old marine data, subscribe to '/sonar_oculus/image' <br>
 	If using fence data, subscrbe to '/sonar_oculus/M1200d/image'. <br>
 	The subscriber part is found in the receive_messages function in the optical flow scripts (cropped and general)
+	
+<h2> Common Troubleshooting </h2>
+<strong> One frame shows, but the image doesn't play <strong>
+	If you get one frame to show up but then the image doesn't move, there is a cv2.waitKey(0) in the code by mistake. Change this to cv2.waitKey(1) for the frames to move in real time. <br>
+	
