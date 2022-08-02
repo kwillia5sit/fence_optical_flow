@@ -58,6 +58,6 @@ Note: Use catkin build instead of catkin make for the workspace
 	The subscriber part is found in the receive_messages function in the optical flow scripts (cropped and general)
 	
 <h2> Common Troubleshooting </h2>
-<strong> One frame shows, but the image doesn't play <strong>
+<strong> One frame shows, but the image doesn't play </strong> <br>
 	If you get one frame to show up but then the image doesn't move, there is a cv2.waitKey(0) in the code by mistake. Change this to cv2.waitKey(1) for the frames to move in real time. <br>
 	
