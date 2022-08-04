@@ -15,7 +15,7 @@ import yaml
  # documents = yaml.full_load(file)
 
 #choose a window size for the optical flow parameters (multiple of 3)
-window_leg = 27
+window_leg = 18
 
 #define a global counter variable and set as 0. 
 i = 0
@@ -23,7 +23,7 @@ i = 0
 # Parameters for lucas kanade optical flow
 lk_params = dict(winSize = (window_leg, window_leg),              #window size each pyramid level
 	    		 maxLevel = 4,                       #number of pyramid levels 
-		    	 criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT,   #termination criteria: Stop after 10 iterations, 
+		    	 criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT,   #termination criteria: Stop after 4 iterations, 
                                                                                 #criteria count matches the quality level
 			    			4, 0.025),
                  flags = 0,                 #Flags determine what the error is calculating.
@@ -37,14 +37,15 @@ detector = cv2.AKAZE_create(
                   descriptor_channels=1     )
 
 #Function for Brute Force Feature Matcher
-bf = cv2.BFMatcher(cv2.NORM_L1, crossCheck=True)
+bf = cv2.BFMatcher(cv2.NORM_L1,       #AKAZE type of descriptors
+                    crossCheck=True)  #Check that the best match from image 1 to 2 is the same as from image 2 to 1
 
 class track_point:
   def __init__(self, x, y, descs):
     self.x = x
     self.y = y
-    self.descs = descs
-    
+    self.descs = descs    
+track_points_list = list()
 
 def get_image(data):
   #Convert the frame's ROS image data to an opencv image
@@ -90,9 +91,16 @@ def verify_points(raw_matches, desc_cur):
                                     True)   #compactResult = false
   return good_matches
 
+def translation(prev_x, prev_y, cur_x, cur_y):
+    delta_x = cur_x - prev_x
+    delta_y = cur_y - prev_y
+
+    return delta_x, delta_y
+
 def callback(data):
   #Make the global variables for the named variables
   global prev_gray
+  global prev_frame
   global key_points
   global raw_key_points
   global raw_cur_points
@@ -109,23 +117,13 @@ def callback(data):
 
   #Case 1/2: it's the first frame of the whole series. 
   if i<1:
-    #print(documents)
-    #print(yaml.dump(lk_params))
     #Take the first image
     prev_frame, prev_gray = get_image(data)
-
     #AKAZE detect keypoints from the first frame
     raw_key_points, descsi = detector.detectAndCompute(prev_gray, None)
-   # print("What raw keypoints looks like:")
-   # print(raw_key_points)
-   # print("array shape of raw keypoints", np.shape(raw_key_points))
-   # print("what descsi looks like:")
-   # print(descsi)
-  #  print("array shape of descs: ", np.shape(descsi))
     #Convert key points to coordinate tuples
     key_points = cv2.KeyPoint_convert(raw_key_points)
-    print("what converted keypoints looks like")
-    print(key_points)
+    #For us to see how many keypoints we have
     print("array shape coverted keypoints: ", np.shape(key_points))
 
     #Create array of random colors for drawing purposes
@@ -146,13 +144,15 @@ def callback(data):
     key_points.shape = (my_size, 1, 2)
     first_points = key_points
     
+    #add 1 to the counter so we move on from this loop
     i = i+1
 
+  #case 2/2: it's not the first frame and we want the optical flow
   if i > 0 and i <30:
     #Get the current frame
     cur_frame, cur_gray = get_image(data)
     cv2.imshow("current grasyscale", cur_gray)
-    cv2.waitKey(1)
+    cv2.waitKey(0)
     # Create a mask image for drawing purposes
     draw_mask = np.zeros_like(cur_frame)
 
@@ -162,63 +162,74 @@ def callback(data):
 									        key_points, None,
 									         **lk_params)
 
+    #Time to check if points are good based on if they have good matches between frames
     #Keep this raw_cur_points separate from cur_points because it comes in a different format
     raw_cur_points, desc_cur = detector.detectAndCompute(cur_gray, None, cur_points)
     raw_matches = bf.match(descsi, desc_cur)
 
-    #for y in range(len(cur_points)):
-      #cur_points_raw, desc_cur = detector.detectAndCompute(cur_gray, None, cur_points[y])
-      #print("descriptors:", desc_cur)
-      #match = bf.match(descsi[y], desc_cur[y])
-      #print("match:", match)
-      #mask_match = 
-      #Matches come out reading like this: < cv2.DMatch 0x7f1a94a48f70>
-
-      #stats = np.array([cur_points[y], ",", st[y], ",", err[y]])
-      #print(stats)
-
+    #current points to be used as coordinates
     cur_size = int(cur_points.size)
     cur_size = int(cur_size/2)
     cur_points.shape = (cur_size, 1, 2)    ##  tracking.append([cur_points, st])
-     # print(tracking)
-    #Use the resizing array method again on the current points
 
     # Only use good points (had status 1)
     good_cur = cur_points[st == 1]
     good_prev = key_points[st == 1]
 
+    #Verify that the new point is reasonably close to the old point
+    #For each point in good points:
+    for cp in range(len(good_cur)):
+        print("cp: ", cp)
+        print(cur_points[cp][0][0], cur_points[cp][0][1])
+
+        print("keypoint", key_points[cp][0][0], key_points[cp][0][1])
+        travel_x, travel_y = translation(key_points[cp][0][0], key_points[cp][0][1], 
+                                        cur_points[cp][0][0], cur_points[cp][0][1])
+        print("travel x", travel_x)
+        print("travel y", travel_y)
+        #If it has moved 2 pixels in either x direction:
+        if travel_x > 2 or travel_x < -2:
+            #Too far in one frame; status is bad
+            st == 0
+        #If it has moved 3 pixels in eiter y direction:
+        if travel_y > 3 or travel_y < -3:
+            #Too far in one frame; status is bad
+            st == 0
+        #How abs val 2 and 3 were chosen:
+        #the distance while the wall went spinning (travel x and y) were printed for a few frames
+        #The highest amounts were less than 2, and y direction can have more slack than x direction 
+        #since the sonar is really eucludian so 3 was chosen to make y's threshold higher
+        else:
+            #We want to keep the transform data
+            track_points_list.append([cur_points[cp][0][0], cur_points[cp][0][1], 
+                                        travel_x, travel_y])
+    #Check what track_points_list looks like now:
+    print("track points list is:")
+    print(track_points_list)
+
     # Make a loop to put points into an array
+    # Need to make this so only the points in track_points_list are considered
     for s, (cur, prev) in enumerate(zip(good_cur, 
                                        good_prev)):
         #Prepare array to be tuples for the line function
         a, b = cur.ravel()
         c, d = prev.ravel()
 
-        #Print the error
-        #print("The error for ", cur, "is:", err[s])
-        #"L1 distance between new patch and original patch / pixels in window is error"
-        L1 = err[s]*window_leg
-        #print("L1 = ", err[s]*9)
-        #If error is greater than 3 and less than 500:
-        if L1>3 and L1 < 1500:
-            #If the L1 is in the range we're okay with, then make the current point a track_points instance
-            z = track_point(a, b, desc_cur)
-            #print("z is ", z.x, z.y)
-            #Pick color number s from the array and turn its numbers into a list
-            rand_color = color_array[s].tolist()
-            #draw a line on the mask
-            mask_line = cv2.line(draw_mask, (int(a), int(b)), (int(c), int(d)), 
-                            rand_color, 2)
-            frame = cv2.circle(cur_frame, (int(a), int(b)), 5,
+        z = track_point(a, b, desc_cur)
+        #print("z is ", z.x, z.y)
+        #Pick color number s from the array and turn its numbers into a list
+        rand_color = color_array[s].tolist()
+        #draw a line on the mask
+        mask_line = cv2.line(draw_mask, (int(a), int(b)), (int(c), int(d)), 
+                           rand_color, 2)
+        frame = cv2.circle(cur_frame, (int(a), int(b)), 5,
                            rand_color, -1)
-            #avg_err= sum(L1)/s
-            #print("avg_err = ", avg_err)   
-            image = cv2.add(mask_line, frame)
+        #avg_err= sum(L1)/s
+        #print("avg_err = ", avg_err)   
+        image = cv2.add(mask_line, frame)
 
-        else:
-          pass
     cv2.imshow('optical flow', image)
-    cv2.waitKey(1)
+    cv2.waitKey(0)
     print("z's are ",s, z.x, z.y)
     if i == 30:
       #Do the transform
@@ -228,6 +239,7 @@ def callback(data):
     else:
       key_points = cur_points
       prev_gray = cur_gray
+      prev_frame = cur_frame
       #add 1 to the counter 
       i = i+1
 #end of callback loop
