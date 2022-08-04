@@ -56,8 +56,8 @@ def callback(data):
   #Initialize cv image convertor and AKAZE feature detector
   br = CvBridge()
 
-  #Case 1/2: it's the first frame of the whole series. 
-  if i<1:
+  #Case 1/2: it's the first frame and we're looking for points to detect
+  if (i % 30 == 0):
     # Take first frame of bag message and convert it to openCv image:
     prev_frame = br.imgmsg_to_cv2(data)
     #Take that frame and convert it to a grayscale image:
@@ -148,7 +148,7 @@ def receive_message():
   # numbers are added to the end of the name. 
   rospy.init_node('optflowLK_node', anonymous=True)
   # Node is subscribing to the sonar oculus node/image topic
-  rospy.Subscriber('/sonar_oculus_node/M1200d/image', Image, callback)
+  rospy.Subscriber('/sonar_oculus_node/image', Image, callback)
   rospy.spin()
   cv2.destroyAllWindows()
 

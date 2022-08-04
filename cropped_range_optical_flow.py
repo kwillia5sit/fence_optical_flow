@@ -148,11 +148,11 @@ def callback(data):
     i = i+1
 
   #case 2/2: it's not the first frame and we want the optical flow
-  if i > 0 and i <30:
+  else:
     #Get the current frame
     cur_frame, cur_gray = get_image(data)
     cv2.imshow("current grasyscale", cur_gray)
-    cv2.waitKey(0)
+    cv2.waitKey(1)
     # Create a mask image for drawing purposes
     draw_mask = np.zeros_like(cur_frame)
 
@@ -183,10 +183,10 @@ def callback(data):
         print(cur_points[cp][0][0], cur_points[cp][0][1])
 
         print("keypoint", key_points[cp][0][0], key_points[cp][0][1])
+        #Call the translation function to find the x and y translations
         travel_x, travel_y = translation(key_points[cp][0][0], key_points[cp][0][1], 
                                         cur_points[cp][0][0], cur_points[cp][0][1])
-        print("travel x", travel_x)
-        print("travel y", travel_y)
+
         #If it has moved 2 pixels in either x direction:
         if travel_x > 2 or travel_x < -2:
             #Too far in one frame; status is bad
@@ -203,10 +203,13 @@ def callback(data):
             #We want to keep the transform data
             track_points_list.append([cur_points[cp][0][0], cur_points[cp][0][1], 
                                         travel_x, travel_y])
-    #Check what track_points_list looks like now:
-    print("track points list is:")
-    print(track_points_list)
+    #Let's check what the array of tracking points looks like
+    track_points_array = np.array(track_points_list)
+    track_size = len(track_points_list)
+    track_points_array.shape = (track_size, 1, 4)
+    print("track points array", track_points_array)
 
+    
     # Make a loop to put points into an array
     # Need to make this so only the points in track_points_list are considered
     for s, (cur, prev) in enumerate(zip(good_cur, 
@@ -214,8 +217,6 @@ def callback(data):
         #Prepare array to be tuples for the line function
         a, b = cur.ravel()
         c, d = prev.ravel()
-
-        z = track_point(a, b, desc_cur)
         #print("z is ", z.x, z.y)
         #Pick color number s from the array and turn its numbers into a list
         rand_color = color_array[s].tolist()
@@ -226,22 +227,16 @@ def callback(data):
                            rand_color, -1)
         #avg_err= sum(L1)/s
         #print("avg_err = ", avg_err)   
-        image = cv2.add(mask_line, frame)
+        image = cv2.add(frame, mask_line)
 
     cv2.imshow('optical flow', image)
-    cv2.waitKey(0)
-    print("z's are ",s, z.x, z.y)
-    if i == 30:
-      #Do the transform
-
-      #reset loop to beginning (i = 0)
-      i == 0
-    else:
-      key_points = cur_points
-      prev_gray = cur_gray
-      prev_frame = cur_frame
-      #add 1 to the counter 
-      i = i+1
+    cv2.waitKey(1)
+  
+    key_points = cur_points
+    prev_gray = cur_gray
+    prev_frame = cur_frame
+    #add 1 to the counter 
+    i = i+1
 #end of callback loop
 
 def receive_message():
