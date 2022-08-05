@@ -1,5 +1,7 @@
+#Crops the sonar image and then calculates the optical flow within that smaller area
 #!/usr/bin/env python3
 
+#MAJOR NOTE: key_points are previous frame's points
 from colorsys import rgb_to_hls
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,8 +20,6 @@ i = 0
 
 #Create an empty list to keep the points we're tracking   
 track_points_list = list()
-#Create an empty dictionary that organizes all the points we're tracking
-track_points_dict = {}
 
 #Initialize cv image convertor 
 br = CvBridge()
@@ -40,19 +40,23 @@ detector = cv2.AKAZE_create(
                                       #Descriptor type 3 = normal/not that
                   descriptor_channels=1     )
 
+#Point matching was considered as a way to verify points being tracked are reasonable
+#It had complications with data types and how close matches should be when the sonar intensity can change between frames 
+#So instead this code will use change in distance limits to verify points are good
+#The BF Matcher is left here commented out just in case it's ever useful
 #Function for Brute Force Feature Matcher
-bf = cv2.BFMatcher(cv2.NORM_L1,       #AKAZE type of descriptors
-                    crossCheck=True)  #Check that the best match from image 1 to 2 is the same as from image 2 to 1
+#bf = cv2.BFMatcher(cv2.NORM_L1,       #Read the AKAZE type of descriptors
+#                    crossCheck=True)  #Check that the best match from image 1 to 2 is the same as from image 2 to 1
 
 #Make 500 random colors that we can pull for drawing later
+no_of_colors = 500
 #create empty array with 3 rows
 color_array = np.empty((0,3), int)
-for c in range(500):
-  #Generate random color 
+for c in range(no_of_colors):
+  #Generate random color arrays one by one for formatting
   color = [random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)]
   #Add color to the array
   color_array = np.append(color_array, np.array([color]), axis=0)
-
 
 def get_image(data):
   #Convert the frame's ROS image data to an opencv image
@@ -69,9 +73,13 @@ def get_image(data):
   shape = cv2.drawContours(crop_mask, [points], -1, (255, 255, 255), -1, cv2.LINE_AA)
 
   #Define the region we need
-  res = cv2.bitwise_and(frame, frame, mask = crop_mask) 
-  rect = cv2.boundingRect(points) # returns (x,y,w,h) of the rectangle around the polygon
+  res = cv2.bitwise_and(frame, frame, mask = crop_mask)
+  #Return the (x, y, w, h) bounding rectangle around the chosen polygon
+  rect = cv2.boundingRect(points)
+  #Crop the borders to that rectangle
+  #(Because of the mask, we will just see the image where the polygon is. The rectangle crop is just to make things neat and clear to see
   cropped_small = res[rect[1]: rect[1] + rect[3], rect[0]: rect[0] + rect[2]]
+
   #Resize the cropped image so we can see it big
   #Name the rescale size
   scale_percent = 300
@@ -82,7 +90,6 @@ def get_image(data):
   height = int(cropped_small.shape[0] * scale_percent / 100)
   #Resize the image
   cropped = cv2.resize(cropped_small, [width, height])
-
   #Convert that frame to a grayscale image:
   gray_frame = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
 
@@ -90,6 +97,7 @@ def get_image(data):
   return cropped, gray_frame
 
 def translation(prev_x, prev_y, cur_x, cur_y):
+    #Calculate the horizontal and vertical translations
     delta_x = cur_x - prev_x
     delta_y = cur_y - prev_y
     return delta_x, delta_y
@@ -109,10 +117,9 @@ def callback(data):
   global descsi
   global color_array
 
-
-  #Case 1/2: it's the first frame of the whole series. 
+  #Case 1/2: it's the first frame out of a set of thirty 
   if (i % 30 == 0):
-    #Take the first image
+    #Take the image
     prev_frame, prev_gray = get_image(data)
     #AKAZE detect keypoints from the first frame
     raw_key_points, descsi = detector.detectAndCompute(prev_gray, None)
@@ -130,8 +137,13 @@ def callback(data):
     #add 1 to the counter so we move on from this loop
     i = i+1
 
-  #case 2/2: it's not the first frame and we want the optical flow
+  #case 2/2: it's not the first frame of thirty and we want the optical flow
   else:
+    #Create an empty dictionary that organizes all the points we're tracking
+    #It's here instead of at the beginning so it resets each frame and we don't keep the points that aren't in the image anymore
+    track_points_dict = {}
+    #The dict is not in the sonar_optical_flow.py script. It is the latest addition and it is not debugged to work properly in the other script right now
+    
     #Get the current frame
     cur_frame, cur_gray = get_image(data)
     cv2.imshow("current grasyscale", cur_gray)
@@ -139,7 +151,7 @@ def callback(data):
     # Create a mask image for drawing purposes
     draw_mask = np.zeros_like(prev_frame)
 
-	  #calculate optical flow
+    #calculate optical flow
     cur_points, st, err = cv2.calcOpticalFlowPyrLK(prev_gray,
 									        cur_gray,
 									        key_points, None,
@@ -148,17 +160,19 @@ def callback(data):
     #current points to be used as coordinates
     cur_size = int(cur_points.size)
     cur_size = int(cur_size/2)
-    cur_points.shape = (cur_size, 1, 2)    ##  tracking.append([cur_points, st])
+    cur_points.shape = (cur_size, 1, 2)
 
-    # Only use good points (had status 1)
+    # Only use points that calcOpticalFlow found a good corresponding new point for (had status 1)
     good_cur = cur_points[st == 1]
     good_prev = key_points[st == 1]
 
-    good_travel_x = list()
-    good_travel_y = list()
+    #Add the good translation values to a list in case that could be helpful
+    #good_travel_x = list()
+    #good_travel_y = list()
 
-   #To check that the good points make sense:
+   #To check that the points make sense:
     #Verify that the new point is reasonably close to the old point
+    #This part is unique to the cropped version of optical flow script. It didn't work well in the long-range version but eliminated weird jumps and outliers in this version.
     #For each point in good points:
     for gp in range(len(good_cur)):
         #print("cp: ", cp)
@@ -244,7 +258,7 @@ def callback(data):
 #end of callback loop
 
 def receive_message():
-  # Runs once descs1 nce
+  # Runs once
   # Tells rospy the name of the node.
   # Anonymous = True makes sure the node has a unique name. Random
   # numbers are added to the end of the name. 
