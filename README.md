@@ -23,7 +23,7 @@ This code calculates the optical flow of points in the sonar image.<br>
 <strong> cropped_range_optical_flow.py </strong> <br>
 		input: data, crop shape/size, set parameters <br>
 		output: lines and dots on a cropped image tracking the optical flow movement <br>
-This script crops and resizes the sonar image. It then calculates optical flow in the same fashion. Points are verified as good by testing that they do not move too far from the previous location within one frame. This feature currently does not work well in the uncropped sonar_optical_flow script.<br>
+This script crops and resizes the sonar image. It then calculates optical flow in the same fashion. Points are verified as good by testing that they do not move too far from the previous location within one frame. The good points are kept in a dictionary so that they match with one specific color. This feature currently does not work well in the uncropped sonar_optical_flow script.<br>
 <br>
 <strong>unstable_no_crop_consistent_colors</strong>
 		input: data, set parameters <br>
