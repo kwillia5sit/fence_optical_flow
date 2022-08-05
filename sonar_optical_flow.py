@@ -1,5 +1,7 @@
+#Takes the sonar image and calculation parameters and finds the optical flow 
 #!/usr/bin/env python3
 
+#MAJOR NOTE: key_points are the previous frame's points
 from colorsys import rgb_to_hls
 import numpy as np
 import matplotlib.pyplot as plt
@@ -35,13 +37,6 @@ for n in range(no_of_colors):
   #Add color to the array
   color_array = np.append(color_array, np.array([color]), axis=0)
 
-def get_image(data):
-  #Convert the frame's ROS image data to an opencv image
-  frame = br.imgmsg_to_cv2(data)
-  #Convert that frame to a grayscale image:
-  
-
-
 def callback(data):
   #Make the global variables for the named variables
   global prev_frame
@@ -56,7 +51,7 @@ def callback(data):
   #Initialize cv image convertor and AKAZE feature detector
   br = CvBridge()
 
-  #Case 1/2: it's the first frame and we're looking for points to detect
+  #Case 1/2: it's the first frame of a set of 30 and we're looking for points to detect
   if (i % 30 == 0):
     # Take first frame of bag message and convert it to openCv image:
     prev_frame = br.imgmsg_to_cv2(data)
@@ -77,7 +72,7 @@ def callback(data):
     # Create a mask image for drawing purposes
     mask = np.zeros_like(prev_frame)
     i = i+1
-
+  #Case 2/2: it's any other frame and we want to find the optical flow
   else:
     #Take current frame and make it an openCV grayscale
     cur_frame = br.imgmsg_to_cv2(data)
@@ -97,11 +92,13 @@ def callback(data):
     cur_size = int(cur_points.size)
     cur_size = int(cur_size/2)
     cur_points.shape = (cur_size, 1, 2)
-
+    #If we were using a matcher to verify the points, the descriptors (descs) here would be important.
+    #The matcher verification was difficult to implement in the cropped version due to the data types and the changing intensity of sonar images
+    #It might still be able to be done but I couldn't figure it out in my time with these scripts and at least for long-range may not be necessary/the most efficient
     #print("initial descs are: ")
     #print(descsi)
     #compute the descriptors for the curret points
-    cur_descs = detector.detectAndCompute(cur_gray, None, cur_points)
+    #cur_descs = detector.detectAndCompute(cur_gray, None, cur_points)
     #print("current descs are: ")
     #print(cur_descs)
 
@@ -109,6 +106,7 @@ def callback(data):
     good_cur = cur_points[st == 1]
     good_prev = key_points[st == 1]
 
+    #Time to draw the points we like
     # Make a loop to put points into an array
     for s, (cur, prev) in enumerate(zip(good_cur, 
                                        good_prev)):
