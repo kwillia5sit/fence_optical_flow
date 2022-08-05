@@ -60,4 +60,10 @@ Note: Use catkin build instead of catkin make for the workspace
 <h2> Common Troubleshooting </h2>
 <strong> One frame shows, but the image doesn't play </strong> <br>
 	If you get one frame to show up but then the image doesn't move, there is a cv2.waitKey(0) in the code by mistake. Change this to cv2.waitKey(1) for the frames to move in real time. <br>
-	
+
+<h2> Folder with bag data </h2>
+The sample_data.bag is the old marine data. Credit to jake3991 for data.<br>
+The 3_meter_orbit.bag is the new fence in a tank data. Credit to the Jake and his lab<br>
+Google Drive link:<br>
+https://drive.google.com/drive/folders/1Sgbykf3KxymAlvE6IEBY8_Bkyeqsaj60?usp=sharing
+
